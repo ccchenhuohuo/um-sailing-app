@@ -1,10 +1,10 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 
 
 class TagBase(BaseModel):
-    name: str
+    name: str = Field(..., min_length=1, max_length=50)
 
 
 class TagResponse(TagBase):
@@ -15,8 +15,8 @@ class TagResponse(TagBase):
 
 
 class PostBase(BaseModel):
-    title: str
-    content: str
+    title: str = Field(..., min_length=1, max_length=200)
+    content: str = Field(..., min_length=1, max_length=10000)
     tag_id: Optional[int] = None
 
 
@@ -25,8 +25,8 @@ class PostCreate(PostBase):
 
 
 class PostUpdate(BaseModel):
-    title: Optional[str] = None
-    content: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    content: Optional[str] = Field(None, min_length=1, max_length=10000)
     tag_id: Optional[int] = None
 
 
@@ -41,7 +41,7 @@ class PostResponse(PostBase):
 
 
 class CommentBase(BaseModel):
-    content: str
+    content: str = Field(..., min_length=1, max_length=2000)
 
 
 class CommentCreate(CommentBase):

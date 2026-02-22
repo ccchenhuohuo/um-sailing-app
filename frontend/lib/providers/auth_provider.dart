@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'package:flutter/foundation.dart';
 import 'package:riverpod/riverpod.dart' as riverpod;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../config/constants.dart';
@@ -54,8 +55,9 @@ class AuthNotifier extends riverpod.StateNotifier<AuthState> {
   Future<void> _initAuth() async {
     try {
       await checkAuth();
-    } catch (e) {
-      // 出错时直接设置为未登录状态
+    } catch (e, stackTrace) {
+      // 记录错误用于调试
+      debugPrint('Auth initialization failed: $e\n$stackTrace');
       state = AuthState(isAuthenticated: false, isLoading: false);
     }
   }
@@ -131,5 +133,9 @@ class AuthNotifier extends riverpod.StateNotifier<AuthState> {
   Future<void> logout() async {
     await ApiService().logout();
     state = AuthState(isAuthenticated: false, user: null, isLoading: false);
+  }
+
+  void updateUser(User user) {
+    state = state.copyWith(user: user);
   }
 }

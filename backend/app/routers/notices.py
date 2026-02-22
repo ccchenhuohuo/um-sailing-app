@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+import logging
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
 from app.database import get_db
-from app.schemas.notice import NoticeCreate, NoticeResponse, NoticeUpdate
 from app.models.notice import Notice
-from app.models.user import User, UserRole
+from app.models.user import User
 from app.routers.deps import get_current_user, get_current_admin
+from app.schemas.notice import NoticeCreate, NoticeResponse, NoticeUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/notices", tags=["notices"])
 
@@ -42,8 +46,13 @@ def create_notice(
 ):
     new_notice = Notice(**notice_data.model_dump(), author_id=current_user.id)
     db.add(new_notice)
-    db.commit()
-    db.refresh(new_notice)
+    try:
+        db.commit()
+        db.refresh(new_notice)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建通知失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return new_notice
 
 
@@ -62,8 +71,13 @@ def update_notice(
     for field, value in update_data.items():
         setattr(notice, field, value)
 
-    db.commit()
-    db.refresh(notice)
+    try:
+        db.commit()
+        db.refresh(notice)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"更新通知失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return notice
 
 
@@ -78,5 +92,10 @@ def delete_notice(
         raise HTTPException(status_code=404, detail="通知不存在")
 
     db.delete(notice)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"删除通知失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "通知删除成功"}

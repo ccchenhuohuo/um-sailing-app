@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import '../../models/activity.dart';
+import '../../models/activity_signup.dart';
 import '../../services/api_service.dart';
 import '../../config/theme.dart';
 import '../../widgets/ocean/ocean_background.dart';
@@ -68,25 +70,96 @@ class ActivitiesScreen extends StatelessWidget {
   }
 }
 
-class ActivitiesListPage extends StatelessWidget {
+class ActivitiesListPage extends StatefulWidget {
   final bool upcoming;
 
   const ActivitiesListPage({super.key, required this.upcoming});
 
   @override
+  State<ActivitiesListPage> createState() => _ActivitiesListPageState();
+}
+
+class _ActivitiesListPageState extends State<ActivitiesListPage> {
+  final _apiService = ApiService();
+  late Future<List<Activity>> _activitiesFuture;
+  List<ActivitySignup>? _signups;
+  List<Activity>? _filteredActivities;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  Future<void> _loadData() async {
+    _activitiesFuture = _apiService.getActivities();
+    // 直接在主 isolate 过滤，不需要 compute
+    _activitiesFuture.then((activities) {
+      final now = DateTime.now();
+      final filtered = widget.upcoming
+          ? activities.where((a) => a.startTime.isAfter(now)).toList()
+          : activities.where((a) => a.endTime.isBefore(now)).toList();
+      if (mounted) {
+        setState(() {
+          _filteredActivities = filtered;
+        });
+      }
+    });
+    // 预加载报名状态
+    try {
+      final signups = await _apiService.getMyActivitySignups();
+      if (mounted) {
+        setState(() {
+          _signups = signups;
+        });
+      }
+    } catch (e) {
+      debugPrint('加载报名状态失败: $e');
+    }
+  }
+
+  bool _isSignedUp(int activityId) {
+    if (_signups == null) return false;
+    return _signups!.any((s) => s.activityId == activityId);
+  }
+
+  @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Activity>>(
-      future: ApiService().getActivities(),
+      future: _activitiesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF1E8C93)));
         }
 
+        if (snapshot.hasError) {
+          return Center(
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                Icon(Icons.error_outline, size: 64, color: Colors.red[300]),
+                const SizedBox(height: 16),
+                Text(
+                  '加载失败: ${snapshot.error}',
+                  style: const TextStyle(fontSize: 16, color: Colors.black54),
+                  textAlign: TextAlign.center,
+                ),
+                const SizedBox(height: 16),
+                ElevatedButton(
+                  onPressed: () => setState(() => _loadData()),
+                  child: const Text('重试'),
+                ),
+              ],
+            ),
+          );
+        }
+
         final activities = snapshot.data ?? [];
-        final now = DateTime.now();
-        final filtered = upcoming
-            ? activities.where((a) => a.startTime.isAfter(now)).toList()
-            : activities.where((a) => a.endTime.isBefore(now)).toList();
+        // 使用缓存的过滤结果，避免每次 build 都执行过滤
+        final filtered = _filteredActivities ??
+            (widget.upcoming
+                ? activities.where((a) => a.startTime.isAfter(DateTime.now())).toList()
+                : activities.where((a) => a.endTime.isBefore(DateTime.now())).toList());
 
         if (filtered.isEmpty) {
           return Center(
@@ -96,7 +169,7 @@ class ActivitiesListPage extends StatelessWidget {
                 Icon(Icons.event_busy, size: 64, color: Colors.black26),
                 const SizedBox(height: 16),
                 Text(
-                  upcoming ? '暂无即将开始的活动' : '暂无已结束的活动',
+                  widget.upcoming ? '暂无即将开始的活动' : '暂无已结束的活动',
                   style: const TextStyle(fontSize: 16, color: Colors.black54),
                 ),
               ],
@@ -109,7 +182,15 @@ class ActivitiesListPage extends StatelessWidget {
           itemCount: filtered.length,
           itemBuilder: (context, index) {
             final activity = filtered[index];
-            return ActivityCard(activity: activity);
+            final now = DateTime.now();
+            final isEnded = activity.endTime.isBefore(now);
+            return ActivityCard(
+              activity: activity,
+              isSignedUp: _isSignedUp(activity.id),
+              isEnded: isEnded,
+              onSignupSuccess: _loadData,
+              apiService: _apiService,
+            );
           },
         );
       },
@@ -119,14 +200,25 @@ class ActivitiesListPage extends StatelessWidget {
 
 class ActivityCard extends StatelessWidget {
   final Activity activity;
+  final bool isSignedUp;
+  final bool isEnded;
+  final VoidCallback? onSignupSuccess;
+  final ApiService? apiService;
 
-  const ActivityCard({super.key, required this.activity});
+  const ActivityCard({
+    super.key,
+    required this.activity,
+    this.isSignedUp = false,
+    this.isEnded = false,
+    this.onSignupSuccess,
+    this.apiService,
+  });
 
   @override
   Widget build(BuildContext context) {
     return WhiteCard(
       margin: const EdgeInsets.only(bottom: 12),
-      onTap: () => _showDetail(context),
+      onTap: () => context.push('/activity/${activity.id}'),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -161,7 +253,7 @@ class ActivityCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFF1E8C93).withOpacity(0.15),
+                  color: const Color(0xFF1E8C93).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Icon(Icons.location_on, size: 14, color: Color(0xFF1E8C93)),
@@ -181,7 +273,7 @@ class ActivityCard extends StatelessWidget {
               Container(
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE8B84A).withOpacity(0.15),
+                  color: const Color(0xFFE8B84A).withValues(alpha: 0.15),
                   borderRadius: BorderRadius.circular(6),
                 ),
                 child: const Icon(Icons.access_time, size: 14, color: Color(0xFFE8B84A)),
@@ -201,7 +293,7 @@ class ActivityCard extends StatelessWidget {
                 Container(
                   padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFF1E8C93).withOpacity(0.1),
+                    color: const Color(0xFF1E8C93).withValues(alpha: 0.1),
                     borderRadius: BorderRadius.circular(6),
                   ),
                   child: Text(
@@ -209,18 +301,7 @@ class ActivityCard extends StatelessWidget {
                     style: const TextStyle(color: Color(0xFF1E8C93), fontSize: 12),
                   ),
                 ),
-              ElevatedButton(
-                onPressed: () => _handleSignup(context),
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8B84A),
-                  foregroundColor: const Color(0xFF0A1628),
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                ),
-                child: const Text('报名'),
-              ),
+              _buildSignupButton(context),
             ],
           ),
         ],
@@ -234,7 +315,7 @@ class ActivityCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: const Color(0xFF1E8C93).withOpacity(0.15),
+          color: const Color(0xFF1E8C93).withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Text(
@@ -246,7 +327,7 @@ class ActivityCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.green.withOpacity(0.15),
+          color: Colors.green.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Text(
@@ -258,7 +339,7 @@ class ActivityCard extends StatelessWidget {
       return Container(
         padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
         decoration: BoxDecoration(
-          color: Colors.grey.withOpacity(0.15),
+          color: Colors.grey.withValues(alpha: 0.15),
           borderRadius: BorderRadius.circular(8),
         ),
         child: const Text(
@@ -269,97 +350,16 @@ class ActivityCard extends StatelessWidget {
     }
   }
 
-  void _showDetail(BuildContext context) {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => Container(
-        padding: const EdgeInsets.all(24),
-        decoration: const BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                Expanded(
-                  child: Text(
-                    activity.title,
-                    style: const TextStyle(fontSize: 22, fontWeight: FontWeight.bold, color: Colors.black),
-                  ),
-                ),
-                IconButton(
-                  onPressed: () => Navigator.pop(context),
-                  icon: const Icon(Icons.close, color: Colors.black54),
-                ),
-              ],
-            ),
-            const SizedBox(height: 16),
-            if (activity.description != null) ...[
-              const Text('活动介绍', style: TextStyle(fontWeight: FontWeight.bold, color: Colors.black)),
-              const SizedBox(height: 8),
-              Text(activity.description!, style: const TextStyle(color: Colors.black87)),
-              const SizedBox(height: 16),
-            ],
-            _buildInfoRow(Icons.location_on, '地点', activity.location ?? '未指定'),
-            _buildInfoRow(Icons.access_time, '开始时间', DateFormat('yyyy-MM-dd HH:mm').format(activity.startTime)),
-            _buildInfoRow(Icons.access_time, '结束时间', DateFormat('yyyy-MM-dd HH:mm').format(activity.endTime)),
-            if (activity.maxParticipants > 0)
-              _buildInfoRow(Icons.people, '人数限制', '${activity.maxParticipants} 人'),
-            const Spacer(),
-            SizedBox(
-              width: double.infinity,
-              child: ElevatedButton(
-                style: ElevatedButton.styleFrom(
-                  backgroundColor: const Color(0xFFE8B84A),
-                  foregroundColor: const Color(0xFF0A1628),
-                  padding: const EdgeInsets.symmetric(vertical: 16),
-                  shape: RoundedRectangleBorder(
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                ),
-                onPressed: () => _handleSignup(context),
-                child: const Text('立即报名', style: TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(IconData icon, String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Row(
-        children: [
-          Container(
-            padding: const EdgeInsets.all(8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1E8C93).withOpacity(0.15),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(icon, size: 18, color: const Color(0xFF1E8C93)),
-          ),
-          const SizedBox(width: 12),
-          Text('$label: ', style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black)),
-          Expanded(child: Text(value, style: const TextStyle(color: Colors.black87))),
-        ],
-      ),
-    );
-  }
-
   void _handleSignup(BuildContext context) async {
+    final service = apiService ?? ApiService();
     try {
-      await ApiService().signupActivity(activity.id);
+      await service.signupActivity(activity.id);
       if (context.mounted) {
-        Navigator.pop(context);
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('报名成功！')),
         );
+        // 通知父组件刷新状态
+        onSignupSuccess?.call();
       }
     } catch (e) {
       if (context.mounted) {
@@ -368,6 +368,59 @@ class ActivityCard extends StatelessWidget {
         );
       }
     }
+  }
+
+  Widget _buildSignupButton(BuildContext context) {
+    // 活动已结束，禁用按钮
+    if (isEnded) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.grey[300],
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Text(
+          '已结束',
+          style: TextStyle(color: Colors.grey, fontWeight: FontWeight.w500),
+        ),
+      );
+    }
+
+    // 已报名，显示不同样式
+    if (isSignedUp) {
+      return Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        decoration: BoxDecoration(
+          color: Colors.green.withValues(alpha: 0.15),
+          borderRadius: BorderRadius.circular(8),
+        ),
+        child: const Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Icon(Icons.check_circle, size: 16, color: Colors.green),
+            SizedBox(width: 4),
+            Text(
+              '已报名',
+              style: TextStyle(color: Colors.green, fontWeight: FontWeight.w500),
+            ),
+          ],
+        ),
+      );
+    }
+
+    // 未报名，可点击
+    return ElevatedButton(
+      onPressed: () => _handleSignup(context),
+      style: ElevatedButton.styleFrom(
+        backgroundColor: const Color(0xFFE8B84A),
+        foregroundColor: const Color(0xFF0A1628),
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(8),
+        ),
+      ),
+      child: const Text('报名'),
+    );
   }
 }
 
@@ -568,7 +621,7 @@ class _CreateActivitySheetState extends State<CreateActivitySheet> {
       firstDate: DateTime.now(),
       lastDate: DateTime.now().add(const Duration(days: 365)),
     );
-    if (date == null) return;
+    if (date == null || !mounted) return;
 
     final time = await showTimePicker(
       context: context,
@@ -602,6 +655,14 @@ class _CreateActivitySheetState extends State<CreateActivitySheet> {
         return;
       }
 
+      // 验证结束时间必须晚于开始时间
+      if (_endTime!.isBefore(_startTime!)) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('结束时间必须晚于开始时间')),
+        );
+        return;
+      }
+
       try {
         await ApiService().createActivity(
           title: _titleController.text,
@@ -618,6 +679,7 @@ class _CreateActivitySheetState extends State<CreateActivitySheet> {
           );
         }
       } catch (e) {
+        if (!mounted) return;
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('创建失败: $e')),
         );

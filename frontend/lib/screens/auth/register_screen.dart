@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/ocean/ocean_background.dart';
-import 'dart:math' as math;
 
 class RegisterScreen extends ConsumerStatefulWidget {
   const RegisterScreen({super.key});
@@ -138,7 +137,7 @@ class _RegisterScreenState extends ConsumerState<RegisterScreen> {
                             Container(
                               padding: const EdgeInsets.all(12),
                               decoration: BoxDecoration(
-                                color: const Color(0xFFFF6B6B).withOpacity(0.1),
+                                color: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
                                 borderRadius: BorderRadius.circular(8),
                                 border: Border.all(
                                   color: const Color(0xFFFF6B6B),

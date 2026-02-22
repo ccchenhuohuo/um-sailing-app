@@ -158,13 +158,26 @@ class BoatsScreen extends StatelessWidget {
   }
 }
 
-class BoatsGridView extends StatelessWidget {
+class BoatsGridView extends StatefulWidget {
   const BoatsGridView({super.key});
+
+  @override
+  State<BoatsGridView> createState() => _BoatsGridViewState();
+}
+
+class _BoatsGridViewState extends State<BoatsGridView> {
+  late final Future<List<Boat>> _boatsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _boatsFuture = ApiService().getBoats();
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Boat>>(
-      future: ApiService().getBoats(),
+      future: _boatsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF1E8C93)));
@@ -222,8 +235,8 @@ class BoatCard extends StatelessWidget {
                   begin: Alignment.topCenter,
                   end: Alignment.bottomCenter,
                   colors: [
-                    _getBackgroundColor().withOpacity(0.8),
-                    _getBackgroundColor().withOpacity(0.6),
+                    _getBackgroundColor().withValues(alpha: 0.8),
+                    _getBackgroundColor().withValues(alpha: 0.6),
                   ],
                 ),
                 borderRadius: const BorderRadius.vertical(
@@ -236,7 +249,7 @@ class BoatCard extends StatelessWidget {
                       child: Icon(
                         Icons.directions_boat,
                         size: 60,
-                        color: Colors.white.withOpacity(0.9),
+                        color: Colors.white.withValues(alpha: 0.9),
                       ),
                     ),
             ),
@@ -320,7 +333,7 @@ class BoatCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -467,7 +480,7 @@ class BoatCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(8),
             decoration: BoxDecoration(
-              color: const Color(0xFF1E8C93).withOpacity(0.15),
+              color: const Color(0xFF1E8C93).withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(8),
             ),
             child: Icon(icon, size: 18, color: const Color(0xFF1E8C93)),

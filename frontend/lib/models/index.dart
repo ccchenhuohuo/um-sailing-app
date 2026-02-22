@@ -1,5 +1,9 @@
 export 'user.dart';
 export 'activity.dart';
+export 'activity_signup.dart';
 export 'boat.dart';
+export 'boat_rental.dart';
 export 'notice.dart';
 export 'post.dart';
+export 'stats.dart';
+export 'transaction_record.dart';

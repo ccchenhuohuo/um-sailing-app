@@ -17,23 +17,21 @@ class WavePainter extends CustomPainter {
   @override
   void paint(Canvas canvas, Size size) {
     final paint = Paint()
-      ..color = waveColor.withOpacity(opacity)
+      ..color = waveColor.withValues(alpha: opacity)
       ..style = PaintingStyle.fill;
-
-    final path = Path();
 
     // 第一层波浪
     _drawWave(canvas, paint, size, animationValue, 0.5, 0.8);
 
     // 第二层波浪（不同相位）
     final paint2 = Paint()
-      ..color = waveColor.withOpacity(opacity * 0.6)
+      ..color = waveColor.withValues(alpha: opacity * 0.6)
       ..style = PaintingStyle.fill;
     _drawWave(canvas, paint2, size, animationValue + 1.5, 0.6, 1.2);
 
     // 第三层波浪（更淡）
     final paint3 = Paint()
-      ..color = waveColor.withOpacity(opacity * 0.4)
+      ..color = waveColor.withValues(alpha: opacity * 0.4)
       ..style = PaintingStyle.fill;
     _drawWave(canvas, paint3, size, animationValue + 3.0, 0.7, 1.0);
   }

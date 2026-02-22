@@ -1,14 +1,17 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import Annotated
+import logging
 from datetime import timedelta
 
-from app.database import get_db
-from app.schemas.user import UserCreate, UserLogin, Token, UserResponse
-from app.models.user import User, UserRole
-from app.utils.security import hash_password, verify_password, create_access_token
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
 from app.config import settings
+from app.database import get_db
+from app.models.user import User, UserRole
 from app.routers.deps import get_current_user
+from app.schemas.user import UserCreate, UserLogin, Token, UserResponse
+from app.utils.security import hash_password, verify_password, create_access_token
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 
@@ -36,8 +39,13 @@ def register(user_data: UserCreate, db: Session = Depends(get_db)):
         balance=0.00
     )
     db.add(new_user)
-    db.commit()
-    db.refresh(new_user)
+    try:
+        db.commit()
+        db.refresh(new_user)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"用户注册失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="注册失败，请稍后重试")
 
     # 生成token
     access_token_expires = timedelta(minutes=settings.ACCESS_TOKEN_EXPIRE_MINUTES)

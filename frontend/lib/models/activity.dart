@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 class Activity {
   final int id;
   final String title;
@@ -25,18 +23,27 @@ class Activity {
     this.updatedAt,
   });
 
+  /// 安全解析 DateTime 类型
+  static DateTime _parseDateTime(dynamic value, {bool required = false}) {
+    if (value == null) return required ? DateTime.now() : DateTime(1970);
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+    return DateTime.now();
+  }
+
   factory Activity.fromJson(Map<String, dynamic> json) {
     return Activity(
-      id: json['id'],
-      title: json['title'],
-      description: json['description'],
-      location: json['location'],
-      startTime: DateTime.parse(json['start_time']),
-      endTime: DateTime.parse(json['end_time']),
-      maxParticipants: json['max_participants'] ?? 0,
-      creatorId: json['creator_id'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      id: json['id'] as int? ?? 0,
+      title: json['title'] as String? ?? '',
+      description: json['description'] as String?,
+      location: json['location'] as String?,
+      startTime: _parseDateTime(json['start_time'], required: true),
+      endTime: _parseDateTime(json['end_time'], required: true),
+      maxParticipants: json['max_participants'] as int? ?? 0,
+      creatorId: json['creator_id'] as int? ?? 0,
+      createdAt: _parseDateTime(json['created_at'], required: true),
+      updatedAt: json['updated_at'] != null
+          ? _parseDateTime(json['updated_at'])
+          : null,
     );
   }
 

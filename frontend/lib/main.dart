@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import 'app.dart';
-import 'config/constants.dart';
 import 'providers/auth_provider.dart';
 import 'services/api_service.dart';
 

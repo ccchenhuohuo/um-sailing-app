@@ -102,7 +102,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                 });
               },
               backgroundColor: Colors.transparent,
-              indicatorColor: const Color(0xFFE8B84A).withOpacity(0.3),
+              indicatorColor: const Color(0xFFE8B84A).withValues(alpha: 0.3),
               destinations: const [
                 NavigationDestination(
                   icon: Icon(Icons.dashboard, color: Colors.white),
@@ -264,7 +264,7 @@ class DashboardPage extends ConsumerWidget {
                       Container(
                         padding: const EdgeInsets.all(12),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE8B84A).withOpacity(0.2),
+                          color: const Color(0xFFE8B84A).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(10),
                         ),
                         child: const Icon(
@@ -371,7 +371,7 @@ class DashboardPage extends ConsumerWidget {
                       leading: Container(
                         padding: const EdgeInsets.all(8),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFE8B84A).withOpacity(0.2),
+                          color: const Color(0xFFE8B84A).withValues(alpha: 0.2),
                           borderRadius: BorderRadius.circular(8),
                         ),
                         child: const Icon(
@@ -425,7 +425,7 @@ class _DashboardCard extends StatelessWidget {
           Container(
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: color.withOpacity(0.15),
+              color: color.withValues(alpha: 0.15),
               shape: BoxShape.circle,
             ),
             child: Icon(icon, size: 32, color: color),
@@ -450,13 +450,26 @@ final balanceProvider = FutureProvider.autoDispose<double>((ref) async {
   return ApiService().getBalance();
 });
 
-class ActivitiesPage extends StatelessWidget {
+class ActivitiesPage extends StatefulWidget {
   const ActivitiesPage({super.key});
+
+  @override
+  State<ActivitiesPage> createState() => _ActivitiesPageState();
+}
+
+class _ActivitiesPageState extends State<ActivitiesPage> {
+  late final Future<List<Activity>> _activitiesFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _activitiesFuture = ApiService().getActivities();
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Activity>>(
-      future: ApiService().getActivities(),
+      future: _activitiesFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF1E8C93)));
@@ -500,7 +513,7 @@ class ActivitiesPage extends StatelessWidget {
                       Container(
                         padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
                         decoration: BoxDecoration(
-                          color: const Color(0xFF1E8C93).withOpacity(0.15),
+                          color: const Color(0xFF1E8C93).withValues(alpha: 0.15),
                           borderRadius: BorderRadius.circular(20),
                         ),
                         child: Text(
@@ -646,13 +659,26 @@ class ActivitiesPage extends StatelessWidget {
   }
 }
 
-class BoatsPage extends StatelessWidget {
+class BoatsPage extends StatefulWidget {
   const BoatsPage({super.key});
+
+  @override
+  State<BoatsPage> createState() => _BoatsPageState();
+}
+
+class _BoatsPageState extends State<BoatsPage> {
+  late final Future<List<Boat>> _boatsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _boatsFuture = ApiService().getBoats();
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Boat>>(
-      future: ApiService().getBoats(),
+      future: _boatsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF1E8C93)));
@@ -693,8 +719,8 @@ class BoatsPage extends StatelessWidget {
                           begin: Alignment.topCenter,
                           end: Alignment.bottomCenter,
                           colors: [
-                            const Color(0xFF0A1628).withOpacity(0.1),
-                            const Color(0xFF15203B).withOpacity(0.05),
+                            const Color(0xFF0A1628).withValues(alpha: 0.1),
+                            const Color(0xFF15203B).withValues(alpha: 0.05),
                           ],
                         ),
                         borderRadius: const BorderRadius.vertical(
@@ -772,7 +798,7 @@ class BoatsPage extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.15),
+        color: color.withValues(alpha: 0.15),
         borderRadius: BorderRadius.circular(4),
       ),
       child: Text(
@@ -874,13 +900,26 @@ class BoatsPage extends StatelessWidget {
   }
 }
 
-class ForumPage extends StatelessWidget {
+class ForumPage extends StatefulWidget {
   const ForumPage({super.key});
+
+  @override
+  State<ForumPage> createState() => _ForumPageState();
+}
+
+class _ForumPageState extends State<ForumPage> {
+  late final Future<List<Post>> _postsFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _postsFuture = ApiService().getPosts();
+  }
 
   @override
   Widget build(BuildContext context) {
     return FutureBuilder<List<Post>>(
-      future: ApiService().getPosts(),
+      future: _postsFuture,
       builder: (context, snapshot) {
         if (snapshot.connectionState == ConnectionState.waiting) {
           return const Center(child: CircularProgressIndicator(color: Color(0xFF1E8C93)));
@@ -916,7 +955,7 @@ class ForumPage extends StatelessWidget {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: const Color(0xFF1E8C93).withOpacity(0.15),
+                                  color: const Color(0xFF1E8C93).withValues(alpha: 0.15),
                                   shape: BoxShape.circle,
                                 ),
                                 child: const Icon(Icons.person, color: Color(0xFF1E8C93)),
@@ -1131,7 +1170,7 @@ class _PostDetailScreenState extends State<PostDetailScreen> {
               color: Colors.white,
               boxShadow: [
                 BoxShadow(
-                  color: Colors.black.withOpacity(0.05),
+                  color: Colors.black.withValues(alpha: 0.05),
                   blurRadius: 4,
                 ),
               ],
@@ -1387,7 +1426,7 @@ class ProfilePage extends ConsumerWidget {
                   padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
                   decoration: BoxDecoration(
                     color: (user?.isAdmin == true ? Colors.purple : const Color(0xFF1E8C93))
-                        .withOpacity(0.15),
+                        .withValues(alpha: 0.15),
                     borderRadius: BorderRadius.circular(20),
                   ),
                   child: Text(
@@ -1458,7 +1497,7 @@ class ProfilePage extends ConsumerWidget {
                   icon: Icons.history,
                   title: '租船记录',
                   onTap: () {
-                    _showComingSoonDialog(context, '租船记录');
+                    context.push('/my/rentals');
                   },
                 ),
                 const Divider(height: 1),
@@ -1466,7 +1505,7 @@ class ProfilePage extends ConsumerWidget {
                   icon: Icons.event,
                   title: '我的活动',
                   onTap: () {
-                    _showComingSoonDialog(context, '我的活动');
+                    context.push('/my/activities');
                   },
                 ),
                 const Divider(height: 1),
@@ -1474,7 +1513,7 @@ class ProfilePage extends ConsumerWidget {
                   icon: Icons.receipt_long,
                   title: '交易记录',
                   onTap: () {
-                    _showComingSoonDialog(context, '交易记录');
+                    context.push('/transactions');
                   },
                 ),
               ],
@@ -1490,7 +1529,7 @@ class ProfilePage extends ConsumerWidget {
                   icon: Icons.settings,
                   title: '账户设置',
                   onTap: () {
-                    _showComingSoonDialog(context, '账户设置');
+                    context.push('/profile/edit');
                   },
                 ),
                 const Divider(height: 1),
@@ -1519,7 +1558,7 @@ class ProfilePage extends ConsumerWidget {
             width: double.infinity,
             child: ElevatedButton(
               style: ElevatedButton.styleFrom(
-                backgroundColor: const Color(0xFFFF6B6B).withOpacity(0.1),
+                backgroundColor: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
                 foregroundColor: const Color(0xFFFF6B6B),
                 padding: const EdgeInsets.symmetric(vertical: 16),
                 shape: RoundedRectangleBorder(
@@ -1556,7 +1595,7 @@ class ProfilePage extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(8),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E8C93).withOpacity(0.15),
+                color: const Color(0xFF1E8C93).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(8),
               ),
               child: Icon(icon, color: const Color(0xFF1E8C93), size: 22),

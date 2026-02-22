@@ -1,7 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
 import 'wave_painter.dart';
-import 'package:flutter/scheduler.dart';
 
 /// 海洋渐变背景组件
 class OceanBackground extends StatefulWidget {
@@ -31,7 +30,6 @@ class OceanBackground extends StatefulWidget {
 class _OceanBackgroundState extends State<OceanBackground> with TickerProviderStateMixin {
   late AnimationController _waveController;
   late AnimationController _gradientController;
-  late Animation<double> _gradientAnimation;
 
   @override
   void initState() {
@@ -48,10 +46,6 @@ class _OceanBackgroundState extends State<OceanBackground> with TickerProviderSt
       vsync: this,
       duration: const Duration(seconds: 10),
     )..repeat();
-    _gradientAnimation = CurvedAnimation(
-      parent: _gradientController,
-      curve: Curves.easeInOut,
-    );
   }
 
   @override
@@ -209,7 +203,7 @@ class BrandSection extends StatelessWidget {
                   width: 120,
                   height: 120,
                   decoration: BoxDecoration(
-                    color: Colors.white.withOpacity(0.1),
+                    color: Colors.white.withValues(alpha: 0.1),
                     shape: BoxShape.circle,
                     border: Border.all(
                       color: const Color(0xFFE8B84A),
@@ -302,7 +296,7 @@ class FormCard extends StatelessWidget {
           borderRadius: BorderRadius.circular(20),
           boxShadow: [
             BoxShadow(
-              color: Colors.black.withOpacity(0.1),
+              color: Colors.black.withValues(alpha: 0.1),
               blurRadius: 20,
               offset: const Offset(0, 10),
             ),

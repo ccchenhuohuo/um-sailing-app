@@ -1,15 +1,11 @@
-from fastapi import Depends, HTTPException, status, Request
+from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.orm import Session
-from typing import Optional
-from jose import jwt, JWTError
-from pydantic import ValidationError
 
 from app.database import get_db
 from app.models.user import User, UserRole
 from app.schemas.user import TokenData
 from app.utils.security import decode_access_token
-from app.config import settings
 
 # 创建 HTTPBearer 安全方案
 security = HTTPBearer(auto_error=False)

@@ -1,6 +1,12 @@
 from pydantic_settings import BaseSettings
 from typing import Optional
 from functools import lru_cache
+import logging
+
+logger = logging.getLogger(__name__)
+
+# 开发环境默认密钥 - 仅用于开发环境
+DEV_SECRET_KEY = "dev-secret-key-do-not-use-in-production-please-set-env-var"
 
 
 class Settings(BaseSettings):
@@ -11,8 +17,8 @@ class Settings(BaseSettings):
     DB_USER: str = "root"
     DB_PASSWORD: str = "password"
 
-    # JWT
-    SECRET_KEY: str = "your-secret-key-change-in-production"
+    # JWT - 生产环境必须通过环境变量配置
+    SECRET_KEY: str = DEV_SECRET_KEY
     ALGORITHM: str = "HS256"
     ACCESS_TOKEN_EXPIRE_MINUTES: int = 30
 
@@ -20,6 +26,9 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
     DEBUG: bool = True
+
+    # CORS - 使用环境变量控制
+    CORS_ORIGINS: str = "*"
 
     # Email (optional)
     SMTP_HOST: Optional[str] = None
@@ -30,6 +39,15 @@ class Settings(BaseSettings):
     class Config:
         env_file = ".env"
         case_sensitive = True
+
+    def __init__(self, **kwargs):
+        super().__init__(**kwargs)
+        # 如果使用默认密钥，发出警告
+        if self.SECRET_KEY == DEV_SECRET_KEY:
+            logger.warning("使用默认 SECRET_KEY，生产环境请设置 SECRET_KEY 环境变量")
+        # 如果使用默认数据库密码，发出警告
+        if self.DB_PASSWORD == "password":
+            logger.warning("使用默认数据库密码，请设置 DB_PASSWORD 环境变量")
 
 
 @lru_cache()

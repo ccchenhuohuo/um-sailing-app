@@ -1,6 +1,15 @@
-from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserLogin, Token
-from app.schemas.activity import ActivityCreate, ActivityResponse, ActivityUpdate, ActivitySignupCreate, ActivitySignupResponse, CheckIn
-from app.schemas.boat import BoatCreate, BoatResponse, BoatUpdate, BoatRentalCreate, BoatRentalResponse, BoatReturn
-from app.schemas.finance import FinanceCreate, FinanceResponse, BalanceResponse, TransactionCreate
-from app.schemas.notice import NoticeCreate, NoticeResponse, NoticeUpdate
-from app.schemas.forum import PostCreate, PostResponse, PostUpdate, CommentCreate, CommentResponse, TagResponse
+from app.schemas.user import UserCreate, UserResponse, UserUpdate, UserLogin, Token  # noqa: F401
+from app.schemas.activity import (  # noqa: F401
+    ActivityCreate, ActivityResponse, ActivityUpdate,
+    ActivitySignupCreate, ActivitySignupResponse, CheckIn
+)
+from app.schemas.boat import (  # noqa: F401
+    BoatCreate, BoatResponse, BoatUpdate,
+    BoatRentalCreate, BoatRentalResponse, BoatReturn
+)
+from app.schemas.finance import FinanceCreate, FinanceResponse, BalanceResponse, TransactionCreate  # noqa: F401
+from app.schemas.notice import NoticeCreate, NoticeResponse, NoticeUpdate  # noqa: F401
+from app.schemas.forum import (  # noqa: F401
+    PostCreate, PostResponse, PostUpdate,
+    CommentCreate, CommentResponse, TagResponse
+)

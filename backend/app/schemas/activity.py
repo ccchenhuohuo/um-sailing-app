@@ -1,16 +1,16 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from app.schemas.user import UserResponse
 
 
 class ActivityBase(BaseModel):
-    title: str
-    description: Optional[str] = None
-    location: Optional[str] = None
+    title: str = Field(..., min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    location: Optional[str] = Field(None, max_length=200)
     start_time: datetime
     end_time: datetime
-    max_participants: int = 0
+    max_participants: int = Field(0, ge=0, description="最大参与人数不能为负数")
 
 
 class ActivityCreate(ActivityBase):
@@ -18,9 +18,9 @@ class ActivityCreate(ActivityBase):
 
 
 class ActivityUpdate(BaseModel):
-    title: Optional[str] = None
-    description: Optional[str] = None
-    location: Optional[str] = None
+    title: Optional[str] = Field(None, min_length=1, max_length=200)
+    description: Optional[str] = Field(None, max_length=2000)
+    location: Optional[str] = Field(None, max_length=200)
     start_time: Optional[datetime] = None
     end_time: Optional[datetime] = None
     max_participants: Optional[int] = None

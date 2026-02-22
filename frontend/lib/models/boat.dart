@@ -1,12 +1,15 @@
-import 'dart:convert';
-
 enum BoatStatus {
   available,
   rented,
   maintenance;
 
-  factory BoatStatus.fromString(String value) {
-    return values.firstWhere((e) => e.name == value);
+  /// 安全解析 BoatStatus
+  static BoatStatus fromString(String? value) {
+    if (value == null) return BoatStatus.available;
+    return values.firstWhere(
+      (e) => e.name == value,
+      orElse: () => BoatStatus.available,
+    );
   }
 }
 
@@ -33,17 +36,35 @@ class Boat {
     this.updatedAt,
   });
 
+  /// 安全解析 double 类型
+  static double _parseDouble(dynamic value) {
+    if (value == null) return 0.0;
+    if (value is double) return value;
+    if (value is int) return value.toDouble();
+    if (value is String) return double.tryParse(value) ?? 0.0;
+    return 0.0;
+  }
+
+  /// 安全解析 DateTime 类型
+  static DateTime _parseDateTime(dynamic value, {bool required = false}) {
+    if (value == null) return required ? DateTime.now() : DateTime(1970);
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+    return DateTime.now();
+  }
+
   factory Boat.fromJson(Map<String, dynamic> json) {
     return Boat(
-      id: json['id'],
-      name: json['name'],
-      type: json['type'],
-      status: BoatStatus.fromString(json['status']),
-      rentalPrice: double.parse(json['rental_price'].toString()),
-      imageUrl: json['image_url'],
-      description: json['description'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
+      type: json['type'] as String?,
+      status: BoatStatus.fromString(json['status'] as String?),
+      rentalPrice: _parseDouble(json['rental_price']),
+      imageUrl: json['image_url'] as String?,
+      description: json['description'] as String?,
+      createdAt: _parseDateTime(json['created_at'], required: true),
+      updatedAt: json['updated_at'] != null
+          ? _parseDateTime(json['updated_at'])
+          : null,
     );
   }
 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'package:intl/intl.dart';
 import '../../models/user.dart';
 import '../../providers/auth_provider.dart';
 import '../../services/api_service.dart';
@@ -43,7 +42,7 @@ class ProfileScreen extends ConsumerWidget {
             children: [
               _buildHeader(user),
               const SizedBox(height: 16),
-              _buildBalanceCard(user, context),
+              _buildBalanceCard(user, context, ref),
               const SizedBox(height: 16),
               _buildMenuSection(context),
               const SizedBox(height: 24),
@@ -97,7 +96,7 @@ class ProfileScreen extends ConsumerWidget {
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
             decoration: BoxDecoration(
               color: (user?.isAdmin == true ? Colors.purple : const Color(0xFF1E8C93))
-                  .withOpacity(0.15),
+                  .withValues(alpha: 0.15),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Text(
@@ -113,7 +112,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildBalanceCard(User? user, BuildContext context) {
+  Widget _buildBalanceCard(User? user, BuildContext context, WidgetRef ref) {
     return WhiteCard(
       child: Container(
         padding: const EdgeInsets.all(16),
@@ -128,7 +127,7 @@ class ProfileScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: const Color(0xFFE8B84A).withOpacity(0.2),
+                color: const Color(0xFFE8B84A).withValues(alpha: 0.2),
                 borderRadius: BorderRadius.circular(12),
               ),
               child: const Icon(
@@ -159,7 +158,7 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ),
             InkWell(
-              onTap: () => _showDepositDialog(context),
+              onTap: () => _showDepositDialog(context, ref),
               borderRadius: BorderRadius.circular(8),
               child: Container(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
@@ -251,7 +250,7 @@ class ProfileScreen extends ConsumerWidget {
             Container(
               padding: const EdgeInsets.all(10),
               decoration: BoxDecoration(
-                color: const Color(0xFF1E8C93).withOpacity(0.15),
+                color: const Color(0xFF1E8C93).withValues(alpha: 0.15),
                 borderRadius: BorderRadius.circular(10),
               ),
               child: Icon(icon, color: const Color(0xFF1E8C93), size: 22),
@@ -303,7 +302,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  void _showDepositDialog(BuildContext context) {
+  void _showDepositDialog(BuildContext context, WidgetRef ref) {
     final amountController = TextEditingController();
 
     showDialog(
@@ -359,12 +358,23 @@ class ProfileScreen extends ConsumerWidget {
             onPressed: () async {
               final amount = double.tryParse(amountController.text);
               if (amount != null && amount > 0) {
-                await ApiService().deposit(amount, '用户充值');
-                if (context.mounted) {
-                  Navigator.pop(context);
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('充值成功')),
-                  );
+                try {
+                  await ApiService().deposit(amount, '用户充值');
+                  // 刷新用户状态以更新余额
+                  final updatedUser = await ApiService().getCurrentUser();
+                  ref.read(authProvider.notifier).updateUser(updatedUser);
+                  if (context.mounted) {
+                    Navigator.pop(context);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('充值成功')),
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('充值失败: $e')),
+                    );
+                  }
                 }
               }
             },
@@ -380,7 +390,7 @@ class ProfileScreen extends ConsumerWidget {
       width: double.infinity,
       child: ElevatedButton(
         style: ElevatedButton.styleFrom(
-          backgroundColor: const Color(0xFFFF6B6B).withOpacity(0.1),
+          backgroundColor: const Color(0xFFFF6B6B).withValues(alpha: 0.1),
           foregroundColor: const Color(0xFFFF6B6B),
           padding: const EdgeInsets.symmetric(vertical: 16),
           shape: RoundedRectangleBorder(

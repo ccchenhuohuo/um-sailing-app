@@ -1,12 +1,16 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
+import logging
 from decimal import Decimal
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.user import UserResponse, UserUpdate
 from app.models.user import User, UserRole
 from app.routers.deps import get_current_user, get_current_admin
+from app.schemas.user import UserResponse, UserUpdate
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/users", tags=["users"])
 
@@ -29,6 +33,9 @@ def get_my_info(current_user: User = Depends(get_current_user)):
 
 @router.get("/{user_id}", response_model=UserResponse)
 def get_user(user_id: int, db: Session = Depends(get_db), current_user: User = Depends(get_current_user)):
+    # 只有管理员或本人可以查看用户信息
+    if current_user.id != user_id and current_user.role != UserRole.ADMIN:
+        raise HTTPException(status_code=403, detail="权限不足")
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -54,8 +61,13 @@ def update_user(
     for field, value in update_data.items():
         setattr(user, field, value)
 
-    db.commit()
-    db.refresh(user)
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"操作失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return user
 
 
@@ -65,8 +77,13 @@ def delete_user(user_id: int, db: Session = Depends(get_db), current_user: User 
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
-    db.delete(user)
-    db.commit()
+    try:
+        db.delete(user)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"操作失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "用户删除成功"}
 
 
@@ -77,11 +94,20 @@ def update_balance(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin)
 ):
+    # 验证金额不能为0
+    if amount == 0:
+        raise HTTPException(status_code=400, detail="金额不能为零")
+
     user = db.query(User).filter(User.id == user_id).first()
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
 
     user.balance += Decimal(str(amount))
-    db.commit()
-    db.refresh(user)
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"操作失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "余额更新成功", "new_balance": user.balance}

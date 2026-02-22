@@ -1,13 +1,18 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
-from typing import List
+import logging
 from decimal import Decimal
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy import func
+from sqlalchemy.orm import Session
 
 from app.database import get_db
-from app.schemas.finance import FinanceCreate, FinanceResponse, BalanceResponse
 from app.models.finance import Finance, FinanceType
 from app.models.user import User, UserRole
 from app.routers.deps import get_current_user, get_current_admin
+from app.schemas.finance import FinanceCreate, FinanceResponse, BalanceResponse
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/finances", tags=["finances"])
 
@@ -48,17 +53,24 @@ def create_finance(
     new_finance = Finance(**finance_data.model_dump())
     db.add(new_finance)
 
-    # 如果是收入/支出涉及用户，更新用户余额
+    # 如果是收入/支出涉及用户，更新用户余额，使用行级锁
     if finance_data.user_id:
-        user = db.query(User).filter(User.id == finance_data.user_id).first()
+        user = db.query(User).filter(User.id == finance_data.user_id).with_for_update().first()
         if user:
             if finance_data.type == FinanceType.INCOME:
                 user.balance += Decimal(str(finance_data.amount))
             else:
+                if user.balance < Decimal(str(finance_data.amount)):
+                    raise HTTPException(status_code=400, detail="余额不足")
                 user.balance -= Decimal(str(finance_data.amount))
 
-    db.commit()
-    db.refresh(new_finance)
+    try:
+        db.commit()
+        db.refresh(new_finance)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建财务记录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return new_finance
 
 
@@ -70,10 +82,15 @@ def deposit(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin)
 ):
+    # 验证充值金额必须大于0
+    if amount <= 0:
+        raise HTTPException(status_code=400, detail="充值金额必须大于0")
+
+    # 使用行级锁防止并发充值
     if user_id:
-        user = db.query(User).filter(User.id == user_id).first()
+        user = db.query(User).filter(User.id == user_id).with_for_update().first()
     else:
-        user = current_user
+        user = db.query(User).filter(User.id == current_user.id).with_for_update().first()
 
     if not user:
         raise HTTPException(status_code=404, detail="用户不存在")
@@ -90,8 +107,13 @@ def deposit(
     )
     db.add(finance)
 
-    db.commit()
-    db.refresh(user)
+    try:
+        db.commit()
+        db.refresh(user)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"充值失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "充值成功", "new_balance": user.balance}
 
 
@@ -100,15 +122,19 @@ def get_finance_report(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin)
 ):
-    total_income = db.query(Finance).filter(Finance.type == FinanceType.INCOME).all()
-    total_expense = db.query(Finance).filter(Finance.type == FinanceType.EXPENSE).all()
+    income_sum = db.query(func.sum(Finance.amount)).filter(
+        Finance.type == FinanceType.INCOME
+    ).scalar() or 0
 
-    income_sum = sum(f.amount for f in total_income)
-    expense_sum = sum(f.amount for f in total_expense)
+    expense_sum = db.query(func.sum(Finance.amount)).filter(
+        Finance.type == FinanceType.EXPENSE
+    ).scalar() or 0
+
+    transaction_count = db.query(Finance).count()
 
     return {
-        "total_income": income_sum,
-        "total_expense": expense_sum,
-        "net_balance": income_sum - expense_sum,
-        "transaction_count": len(total_income) + len(total_expense)
+        "total_income": float(income_sum),
+        "total_expense": float(expense_sum),
+        "net_balance": float(income_sum) - float(expense_sum),
+        "transaction_count": transaction_count
     }

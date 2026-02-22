@@ -3,7 +3,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import '../../providers/auth_provider.dart';
 import '../../widgets/ocean/ocean_background.dart';
-import 'package:flutter/scheduler.dart';
 
 class SplashScreen extends ConsumerStatefulWidget {
   const SplashScreen({super.key});
@@ -115,7 +114,7 @@ class _SplashScreenState extends ConsumerState<SplashScreen>
         borderRadius: BorderRadius.circular(24),
         boxShadow: [
           BoxShadow(
-            color: const Color(0xFFE8B84A).withOpacity(0.2),
+            color: const Color(0xFFE8B84A).withValues(alpha: 0.2),
             blurRadius: 30,
             offset: const Offset(0, 15),
           ),

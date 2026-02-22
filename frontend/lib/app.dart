@@ -9,6 +9,11 @@ import 'screens/auth/login_screen.dart';
 import 'screens/auth/register_screen.dart';
 import 'screens/home/home_screen.dart';
 import 'screens/admin/admin_screen.dart';
+import 'screens/profile/profile_edit_screen.dart';
+import 'screens/profile/my_activities_screen.dart';
+import 'screens/profile/my_rentals_screen.dart';
+import 'screens/profile/transaction_history_screen.dart';
+import 'screens/activities/activity_detail_screen.dart';
 
 class App extends ConsumerWidget {
   const App({super.key});
@@ -29,8 +34,6 @@ class App extends ConsumerWidget {
     }
 
     // 初始化时先显示 splash
-    final initialLocation = authState.isAuthenticated ? '/home' : '/login';
-
     return MaterialApp.router(
       title: 'UMA Sailing App',
       theme: AppTheme.lightTheme,
@@ -56,6 +59,35 @@ class App extends ConsumerWidget {
           GoRoute(
             path: '/admin',
             builder: (context, state) => const AdminScreen(),
+          ),
+          GoRoute(
+            path: '/profile/edit',
+            builder: (context, state) => const ProfileEditScreen(),
+          ),
+          GoRoute(
+            path: '/my/activities',
+            builder: (context, state) => const MyActivitiesScreen(),
+          ),
+          GoRoute(
+            path: '/my/rentals',
+            builder: (context, state) => const MyRentalsScreen(),
+          ),
+          GoRoute(
+            path: '/transactions',
+            builder: (context, state) => const TransactionHistoryScreen(),
+          ),
+          GoRoute(
+            path: '/activity/:id',
+            builder: (context, state) {
+              final idParam = state.pathParameters['id'];
+              final activityId = int.tryParse(idParam ?? '');
+              if (activityId == null || activityId <= 0) {
+                return const Scaffold(
+                  body: Center(child: Text('无效的活动ID')),
+                );
+              }
+              return ActivityDetailScreen(activityId: activityId);
+            },
           ),
         ],
       ),

@@ -1,15 +1,19 @@
-from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy.orm import Session
+import logging
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session
+
 from app.database import get_db
+from app.models.forum import Post, Comment, Tag
+from app.models.user import User, UserRole
+from app.routers.deps import get_current_user, get_current_admin
 from app.schemas.forum import (
     PostCreate, PostResponse, PostUpdate,
     CommentCreate, CommentResponse, TagResponse
 )
-from app.models.forum import Post, Comment, Tag
-from app.models.user import User, UserRole
-from app.routers.deps import get_current_user, get_current_admin
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/forum", tags=["forum"])
 
@@ -29,8 +33,13 @@ def create_tag(name: str, db: Session = Depends(get_db), current_user: User = De
 
     new_tag = Tag(name=name)
     db.add(new_tag)
-    db.commit()
-    db.refresh(new_tag)
+    try:
+        db.commit()
+        db.refresh(new_tag)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建标签失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return new_tag
 
 
@@ -70,8 +79,13 @@ def create_post(
 ):
     new_post = Post(**post_data.model_dump(), user_id=current_user.id)
     db.add(new_post)
-    db.commit()
-    db.refresh(new_post)
+    try:
+        db.commit()
+        db.refresh(new_post)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建帖子失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return new_post
 
 
@@ -93,8 +107,13 @@ def update_post(
     for field, value in update_data.items():
         setattr(post, field, value)
 
-    db.commit()
-    db.refresh(post)
+    try:
+        db.commit()
+        db.refresh(post)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"更新帖子失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return post
 
 
@@ -112,7 +131,12 @@ def delete_post(
         raise HTTPException(status_code=403, detail="权限不足")
 
     db.delete(post)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"删除帖子失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "帖子删除成功"}
 
 
@@ -144,8 +168,13 @@ def create_comment(
     comment_dict = comment_data.model_dump(exclude={'post_id'})
     new_comment = Comment(**comment_dict, post_id=post_id, user_id=current_user.id)
     db.add(new_comment)
-    db.commit()
-    db.refresh(new_comment)
+    try:
+        db.commit()
+        db.refresh(new_comment)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建评论失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return new_comment
 
 
@@ -164,5 +193,10 @@ def delete_comment(
         raise HTTPException(status_code=403, detail="权限不足")
 
     db.delete(comment)
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"删除评论失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "评论删除成功"}

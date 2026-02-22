@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:google_fonts/google_fonts.dart';
 import 'constants.dart';
 
 class AppTheme {
@@ -23,7 +22,6 @@ class AppTheme {
         primary: tealColor,
         secondary: goldColor,
         surface: Colors.white,
-        background: Colors.transparent,
         error: errorRed,
       ),
       fontFamily: 'Noto Sans SC',
@@ -104,7 +102,6 @@ class AppTheme {
         primary: tealColor,
         secondary: goldColor,
         surface: const Color(0xCC15203B),
-        background: oceanBlueDark,
         error: errorRed,
       ),
       fontFamily: 'Noto Sans SC',
@@ -217,7 +214,6 @@ class AppTheme {
         primary: const Color(AppConstants.tealAzure),
         secondary: const Color(AppConstants.coralGold),
         surface: const Color(AppConstants.midnightBlue),
-        background: const Color(AppConstants.deepOcean),
       ),
       fontFamily: 'Noto Sans SC',
       scaffoldBackgroundColor: const Color(AppConstants.deepOcean),

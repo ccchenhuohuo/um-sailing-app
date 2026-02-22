@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from app.models.finance import FinanceType
@@ -6,7 +6,7 @@ from app.models.finance import FinanceType
 
 class FinanceBase(BaseModel):
     type: FinanceType
-    amount: float
+    amount: float = Field(..., gt=0, description="金额必须大于0")
     description: Optional[str] = None
     user_id: Optional[int] = None
 
@@ -30,5 +30,5 @@ class BalanceResponse(BaseModel):
 
 
 class TransactionCreate(BaseModel):
-    amount: float
+    amount: float = Field(..., gt=0, description="金额必须大于0")
     description: str

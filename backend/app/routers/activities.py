@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
+import logging
 from typing import List
 
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session, joinedload
+
 from app.database import get_db
-from app.schemas.activity import (
-    ActivityCreate, ActivityResponse, ActivityUpdate,
-    ActivitySignupCreate, ActivitySignupResponse, CheckIn
-)
 from app.models.activity import Activity
 from app.models.signup import ActivitySignup
 from app.models.user import User, UserRole
-from app.routers.deps import get_current_user, get_current_admin
+from app.routers.deps import get_current_user
+from app.schemas.activity import (
+    ActivityCreate, ActivityResponse, ActivityUpdate,
+    ActivitySignupCreate, ActivitySignupResponse
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/activities", tags=["activities"])
 
@@ -22,7 +26,9 @@ def get_activities(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    activities = db.query(Activity).order_by(Activity.start_time.desc()).offset(skip).limit(limit).all()
+    activities = db.query(Activity).options(
+        joinedload(Activity.creator)
+    ).order_by(Activity.start_time.desc()).offset(skip).limit(limit).all()
     return activities
 
 
@@ -44,10 +50,18 @@ def create_activity(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 验证结束时间必须晚于开始时间
+    if activity_data.end_time <= activity_data.start_time:
+        raise HTTPException(status_code=400, detail="结束时间必须晚于开始时间")
+
     new_activity = Activity(**activity_data.model_dump(), creator_id=current_user.id)
     db.add(new_activity)
-    db.commit()
-    db.refresh(new_activity)
+    try:
+        db.commit()
+        db.refresh(new_activity)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="操作失败")
     return new_activity
 
 
@@ -62,16 +76,20 @@ def update_activity(
     if not activity:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    # 只有创建者可以修改（管理员也不行）
-    if activity.creator_id != current_user.id:
+    # 创建者或管理员可以修改
+    if activity.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="权限不足")
 
     update_data = activity_data.model_dump(exclude_unset=True)
     for field, value in update_data.items():
         setattr(activity, field, value)
 
-    db.commit()
-    db.refresh(activity)
+    try:
+        db.commit()
+        db.refresh(activity)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="操作失败")
     return activity
 
 
@@ -90,7 +108,11 @@ def delete_activity(
         raise HTTPException(status_code=403, detail="权限不足")
 
     db.delete(activity)
-    db.commit()
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "活动删除成功"}
 
 
@@ -100,7 +122,10 @@ def signup_activity(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    activity = db.query(Activity).filter(Activity.id == signup_data.activity_id).first()
+    # 使用行级锁防止并发报名超员
+    activity = db.query(Activity).filter(
+        Activity.id == signup_data.activity_id
+    ).with_for_update().first()
     if not activity:
         raise HTTPException(status_code=404, detail="活动不存在")
 
@@ -112,15 +137,20 @@ def signup_activity(
     if existing_signup:
         raise HTTPException(status_code=400, detail="已报名此活动")
 
-    # 检查人数限制
+    # 检查人数限制（已在事务中加锁）
     signup_count = db.query(ActivitySignup).filter(ActivitySignup.activity_id == signup_data.activity_id).count()
     if activity.max_participants > 0 and signup_count >= activity.max_participants:
         raise HTTPException(status_code=400, detail="活动人数已满")
 
     signup = ActivitySignup(activity_id=signup_data.activity_id, user_id=current_user.id)
     db.add(signup)
-    db.commit()
-    db.refresh(signup)
+    try:
+        db.commit()
+        db.refresh(signup)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建报名记录失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return signup
 
 
@@ -139,8 +169,12 @@ def checkin_activity(
         raise HTTPException(status_code=404, detail="未找到报名记录")
 
     signup.check_in = True
-    db.commit()
-    db.refresh(signup)
+    try:
+        db.commit()
+        db.refresh(signup)
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="操作失败")
     return signup
 
 
@@ -160,9 +194,37 @@ def get_activity_signups(
     if not activity:
         raise HTTPException(status_code=404, detail="活动不存在")
 
-    # 只有创建者可以查看报名列表
-    if activity.creator_id != current_user.id:
+    # 创建者或管理员可以查看报名列表
+    if activity.creator_id != current_user.id and current_user.role != UserRole.ADMIN:
         raise HTTPException(status_code=403, detail="权限不足")
 
     signups = db.query(ActivitySignup).filter(ActivitySignup.activity_id == activity_id).all()
     return signups
+
+
+@router.delete("/signup/{activity_id}")
+def cancel_signup(
+    activity_id: int,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    # 先检查活动是否存在
+    activity = db.query(Activity).filter(Activity.id == activity_id).first()
+    if not activity:
+        raise HTTPException(status_code=404, detail="活动不存在")
+
+    signup = db.query(ActivitySignup).filter(
+        ActivitySignup.activity_id == activity_id,
+        ActivitySignup.user_id == current_user.id
+    ).first()
+
+    if not signup:
+        raise HTTPException(status_code=404, detail="未找到报名记录")
+
+    db.delete(signup)
+    try:
+        db.commit()
+    except Exception:
+        db.rollback()
+        raise HTTPException(status_code=500, detail="操作失败")
+    return {"message": "取消报名成功"}

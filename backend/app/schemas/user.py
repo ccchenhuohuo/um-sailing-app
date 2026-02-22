@@ -19,8 +19,6 @@ class UserUpdate(BaseModel):
     username: Optional[str] = None
     email: Optional[EmailStr] = None
     phone: Optional[str] = None
-    role: Optional[UserRole] = None
-    balance: Optional[float] = None
 
 
 class UserResponse(UserBase):

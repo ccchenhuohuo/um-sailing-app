@@ -1,14 +1,14 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Optional
 from datetime import datetime
 from app.models.boat import BoatStatus
 
 
 class BoatBase(BaseModel):
-    name: str
-    type: Optional[str] = None
-    rental_price: float = 0.0
-    description: Optional[str] = None
+    name: str = Field(..., min_length=1, max_length=100)
+    type: Optional[str] = Field(None, max_length=50)
+    rental_price: float = Field(0.0, ge=0, description="租金不能为负数")
+    description: Optional[str] = Field(None, max_length=500)
 
 
 class BoatCreate(BoatBase):
@@ -16,11 +16,11 @@ class BoatCreate(BoatBase):
 
 
 class BoatUpdate(BaseModel):
-    name: Optional[str] = None
-    type: Optional[str] = None
+    name: Optional[str] = Field(None, min_length=1, max_length=100)
+    type: Optional[str] = Field(None, max_length=50)
     status: Optional[BoatStatus] = None
-    rental_price: Optional[float] = None
-    description: Optional[str] = None
+    rental_price: Optional[float] = Field(None, ge=0, description="租金不能为负数")
+    description: Optional[str] = Field(None, max_length=500)
     image_url: Optional[str] = None
 
 

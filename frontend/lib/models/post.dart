@@ -1,5 +1,3 @@
-import 'dart:convert';
-
 class Post {
   final int id;
   final int userId;
@@ -21,16 +19,26 @@ class Post {
     this.updatedAt,
   });
 
+  /// 安全解析 DateTime 类型
+  static DateTime _parseDateTime(dynamic value, {bool required = false}) {
+    if (value == null) return required ? DateTime.now() : DateTime(1970);
+    if (value is String) return DateTime.tryParse(value) ?? DateTime.now();
+    return DateTime.now();
+  }
+
   factory Post.fromJson(Map<String, dynamic> json) {
     return Post(
-      id: json['id'],
-      userId: json['user_id'],
-      authorName: json['author_name'] ?? json['user']?['username'] ?? '匿名用户',
-      title: json['title'],
-      content: json['content'],
-      tagId: json['tag_id'],
-      createdAt: DateTime.parse(json['created_at']),
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at']) : null,
+      id: json['id'] as int? ?? 0,
+      userId: json['user_id'] as int? ?? 0,
+      authorName: json['author_name'] as String? ??
+          (json['user']?['username'] as String? ?? '匿名用户'),
+      title: json['title'] as String? ?? '',
+      content: json['content'] as String? ?? '',
+      tagId: json['tag_id'] as int?,
+      createdAt: _parseDateTime(json['created_at'], required: true),
+      updatedAt: json['updated_at'] != null
+          ? _parseDateTime(json['updated_at'])
+          : null,
     );
   }
 
@@ -67,12 +75,14 @@ class Comment {
 
   factory Comment.fromJson(Map<String, dynamic> json) {
     return Comment(
-      id: json['id'],
-      postId: json['post_id'],
-      userId: json['user_id'],
-      content: json['content'],
-      createdAt: DateTime.parse(json['created_at']),
-      authorName: json['author_name'],
+      id: json['id'] as int? ?? 0,
+      postId: json['post_id'] as int? ?? 0,
+      userId: json['user_id'] as int? ?? 0,
+      content: json['content'] as String? ?? '',
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
+      authorName: json['author_name'] as String?,
     );
   }
 
@@ -98,8 +108,8 @@ class Tag {
 
   factory Tag.fromJson(Map<String, dynamic> json) {
     return Tag(
-      id: json['id'],
-      name: json['name'],
+      id: json['id'] as int? ?? 0,
+      name: json['name'] as String? ?? '',
     );
   }
 

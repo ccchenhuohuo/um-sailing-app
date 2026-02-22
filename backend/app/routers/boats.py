@@ -1,16 +1,20 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session
-from typing import List
+import logging
 from datetime import datetime
+from typing import List
+
+from fastapi import APIRouter, Depends, HTTPException
+from sqlalchemy.orm import Session, joinedload
 
 from app.database import get_db
-from app.schemas.boat import (
-    BoatCreate, BoatResponse, BoatUpdate,
-    BoatRentalCreate, BoatRentalResponse, BoatReturn
-)
 from app.models.boat import Boat, BoatRental, BoatStatus
 from app.models.user import User, UserRole
 from app.routers.deps import get_current_user, get_current_admin
+from app.schemas.boat import (
+    BoatCreate, BoatResponse, BoatUpdate,
+    BoatRentalResponse, BoatReturn
+)
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/boats", tags=["boats"])
 
@@ -45,7 +49,9 @@ def get_all_rentals(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_admin)
 ):
-    rentals = db.query(BoatRental).all()
+    rentals = db.query(BoatRental).options(
+        joinedload(BoatRental.boat)
+    ).all()
     return rentals
 
 
@@ -69,8 +75,13 @@ def create_boat(
 ):
     new_boat = Boat(**boat_data.model_dump())
     db.add(new_boat)
-    db.commit()
-    db.refresh(new_boat)
+    try:
+        db.commit()
+        db.refresh(new_boat)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"创建船只失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return new_boat
 
 
@@ -89,8 +100,13 @@ def update_boat(
     for field, value in update_data.items():
         setattr(boat, field, value)
 
-    db.commit()
-    db.refresh(boat)
+    try:
+        db.commit()
+        db.refresh(boat)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"更新船只失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return boat
 
 
@@ -104,8 +120,13 @@ def delete_boat(
     if not boat:
         raise HTTPException(status_code=404, detail="船只不存在")
 
-    db.delete(boat)
-    db.commit()
+    try:
+        db.delete(boat)
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        logger.error(f"删除船只失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return {"message": "船只删除成功"}
 
 
@@ -115,7 +136,8 @@ def rent_boat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    boat = db.query(Boat).filter(Boat.id == boat_id).first()
+    # 使用 with_for_update() 添加行级锁，防止竞态条件
+    boat = db.query(Boat).filter(Boat.id == boat_id).with_for_update().first()
     if not boat:
         raise HTTPException(status_code=404, detail="船只不存在")
 
@@ -141,8 +163,13 @@ def rent_boat(
     # 扣减余额
     current_user.balance -= boat.rental_price
 
-    db.commit()
-    db.refresh(rental)
+    try:
+        db.commit()
+        db.refresh(rental)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"租船失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return rental
 
 
@@ -152,16 +179,20 @@ def return_boat(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+    # 使用 with_for_update() 添加行级锁，确保事务一致性
     rental = db.query(BoatRental).filter(
         BoatRental.id == return_data.rental_id,
-        BoatRental.user_id == current_user.id,
         BoatRental.status == "active"
-    ).first()
+    ).with_for_update().first()
 
     if not rental:
         raise HTTPException(status_code=404, detail="未找到租赁记录")
 
-    boat = db.query(Boat).filter(Boat.id == rental.boat_id).first()
+    # 管理员可以帮任何用户归还，普通用户只能归还自己的
+    if current_user.role != UserRole.ADMIN and current_user.id != rental.user_id:
+        raise HTTPException(status_code=403, detail="权限不足")
+
+    boat = db.query(Boat).filter(Boat.id == rental.boat_id).with_for_update().first()
     if not boat:
         raise HTTPException(status_code=404, detail="船只不存在")
 
@@ -169,6 +200,11 @@ def return_boat(
     rental.status = "returned"
     boat.status = BoatStatus.AVAILABLE
 
-    db.commit()
-    db.refresh(rental)
+    try:
+        db.commit()
+        db.refresh(rental)
+    except Exception as e:
+        db.rollback()
+        logger.error(f"还船失败: {str(e)}")
+        raise HTTPException(status_code=500, detail="操作失败")
     return rental

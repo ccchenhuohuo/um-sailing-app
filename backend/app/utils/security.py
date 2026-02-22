@@ -1,7 +1,12 @@
+import logging
 from datetime import datetime, timedelta
-from jose import jwt
+
 import bcrypt
+from jose import jwt
+
 from app.config import settings
+
+logger = logging.getLogger(__name__)
 
 
 def hash_password(password: str) -> str:
@@ -13,7 +18,8 @@ def verify_password(plain_password: str, hashed_password: str) -> bool:
     """验证密码"""
     try:
         return bcrypt.checkpw(plain_password.encode('utf-8'), hashed_password.encode('utf-8'))
-    except Exception:
+    except Exception as e:
+        logger.error(f"密码验证失败: {str(e)}")
         return False
 
 
